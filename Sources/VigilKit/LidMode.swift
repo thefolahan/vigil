@@ -69,9 +69,12 @@ public enum LidMode {
     /bin/rm -f \(sudoersPath)
     """
 
-    /// Whether the sudoers rule is in place and works without a password.
+    /// Whether Vigil's sudoers rule is in place and works without a password.
+    /// The file is checked as well, because `sudo -l` also succeeds through
+    /// any other rule that needs no password.
     public static func isInstalled() -> Bool {
-        run(sudo, ["-n", "-l", pmset, "-a", "disablesleep", "0"]).status == 0
+        FileManager.default.fileExists(atPath: sudoersPath)
+            && run(sudo, ["-n", "-l", pmset, "-a", "disablesleep", "0"]).status == 0
     }
 
     // MARK: - Switching

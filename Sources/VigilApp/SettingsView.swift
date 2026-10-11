@@ -38,7 +38,7 @@ struct SettingsView: View {
                             .disabled(model.settingUp)
                     }
                 }
-                Text("Lid mode adds one rule to /etc/sudoers.d/vigil that lets your account run exactly two commands without a password: pmset -a disablesleep 1 and pmset -a disablesleep 0. A guard agent turns sleep back on within 30 seconds if Vigil quits. Lid mode also stops when the Mac runs hot or the battery drops below the limit. Keep the Mac on a hard surface with air around it, never in a bag.")
+                Text("Lid mode adds one rule to /etc/sudoers.d/vigil that lets your account run exactly two commands without a password: pmset -a disablesleep 1 and pmset -a disablesleep 0. A guard agent turns sleep back on within about half a minute if Vigil quits unexpectedly. Lid mode also stops when the Mac runs hot or the battery drops below the limit. Keep the Mac on a hard surface with air around it, never in a bag.")
                     .font(.caption).foregroundStyle(.secondary)
                 if let error = model.setupError {
                     Text(error).font(.caption).foregroundStyle(.red)

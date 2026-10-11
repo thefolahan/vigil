@@ -80,6 +80,11 @@ public struct ActivityPolicy: Sendable, Equatable {
     /// a slow server. Past that it counts only while busy on the CPU, so a dev
     /// server left running in the background does not hold the Mac forever.
     public var toolWindow: TimeInterval = 600
+    /// A gap between samples longer than this means the Mac was asleep.
+    public var sleepGap: TimeInterval = 30
+    /// After a wake every session reconnects and resyncs, which looks like
+    /// work, so traffic is ignored for this long.
+    public var wakeQuiet: TimeInterval = 90
     /// Number of samples averaged.
     public var window: Int = 3
     /// How long an agent must stay idle before it counts as settled.
@@ -116,6 +121,7 @@ public final class AgentTracker {
     private var states: [pid_t: State] = [:]
     private var previous: ProcessTable?
     private var previousTraffic: [pid_t: UInt64] = [:]
+    private var wokeAt: Date?
     private var argumentCache: [pid_t: (started: Date, kind: AgentKind?)] = [:]
     /// Samples taken so far. Activity is known from the second one on.
     public private(set) var samples = 0
@@ -140,7 +146,15 @@ public final class AgentTracker {
     ) -> (agents: [AgentSnapshot], events: [AgentEvent]) {
         var events: [AgentEvent] = []
         let found = findAgents(in: table, arguments: arguments)
-        let elapsed = previous.map { table.takenAt.timeIntervalSince($0.takenAt) } ?? 0
+        var elapsed = previous.map { table.takenAt.timeIntervalSince($0.takenAt) } ?? 0
+        if elapsed > policy.sleepGap {
+            // The Mac slept between samples. Start the traffic history over and
+            // take this sample as the new baseline.
+            wokeAt = table.takenAt
+            elapsed = 0
+            for pid in states.keys { states[pid]?.trafficSamples = [] }
+        }
+        let settling = wokeAt.map { table.takenAt.timeIntervalSince($0) < policy.wakeQuiet } ?? false
 
         for (pid, state) in states where found[pid] == nil {
             events.append(.exited(snapshot(pid: pid, state: state)))
@@ -177,8 +191,8 @@ public final class AgentTracker {
                 let now = table.takenAt
                 // A reply streams across several samples. Idle sessions
                 // sometimes sync a few kilobytes at once, which fits in one.
-                let talking = state.trafficSamples.filter { $0 >= policy.trafficThreshold }.count >= 2
-                if rate >= policy.trafficThreshold { state.lastTraffic = now }
+                let talking = !settling && state.trafficSamples.filter { $0 >= policy.trafficThreshold }.count >= 2
+                if !settling, rate >= policy.trafficThreshold { state.lastTraffic = now }
                 // A tool started within moments of the model's last reply,
                 // which is how an agent runs a command it was asked to run.
                 let runningTool = state.lastTraffic.map { last in

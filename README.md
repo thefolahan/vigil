@@ -50,7 +50,7 @@ you ALL=(root) NOPASSWD: /usr/bin/pmset -a disablesleep 1, /usr/bin/pmset -a dis
 
 That lets your account run exactly those two commands without a password, and nothing else. The rule is checked with `visudo` before it is moved into place, so a bad file can never break `sudo`.
 
-Vigil also installs a small launch agent, `com.thefolahan.vigil.guard`, that runs every 30 seconds and at login. If Vigil turned sleep off and is no longer running, after a crash for example, the guard turns sleep back on.
+Vigil also installs a small launch agent, `com.thefolahan.vigil.guard`, that runs every 30 seconds and at login. If Vigil turned sleep off and is no longer running, after a crash for example, the guard turns sleep back on within about half a minute. A normal quit turns it back on at once.
 
 **Remove lid mode** in Settings deletes the rule and turns sleep back on. Keep a closed Mac on a hard surface with air around it, never in a bag.
 

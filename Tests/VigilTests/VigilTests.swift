@@ -92,6 +92,26 @@ final class TrackerTests: XCTestCase {
         XCTAssertFalse(activities.contains(.working))
     }
 
+    func testReconnectingAfterSleepIsNotWork() {
+        // Idle sessions resync for about half a minute after the Mac wakes.
+        let tracker = AgentTracker()
+        _ = update(tracker, table(at: 0, agentCPU: 0), bytes: 0)
+        _ = update(tracker, table(at: 5, agentCPU: 0), bytes: 75)
+        var activities: [AgentActivity] = []
+        var bytes: UInt64 = 75
+        for step in 0..<10 {
+            bytes += 3_000
+            activities += update(tracker, table(at: 1_000 + Double(step) * 5, agentCPU: 0), bytes: bytes).agents.map(\.activity)
+        }
+        XCTAssertFalse(activities.contains(.working))
+        // Work that goes on after the quiet period counts again.
+        for step in 10..<21 {
+            bytes += 9_000
+            activities += update(tracker, table(at: 1_000 + Double(step) * 5, agentCPU: 0), bytes: bytes).agents.map(\.activity)
+        }
+        XCTAssertEqual(activities.last, .working)
+    }
+
     func testFreshToolCountsAsWorkWithoutTraffic() {
         let tracker = AgentTracker()
         _ = update(tracker, table(at: 0, agentCPU: 0), bytes: 0)

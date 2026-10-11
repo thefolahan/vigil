@@ -2,7 +2,7 @@ import Darwin
 import Foundation
 import VigilKit
 
-let version = "1.0.0"
+let version = "1.0.1"
 
 let usage = """
 vigil \(version): keeps your Mac awake while your coding agents work.
