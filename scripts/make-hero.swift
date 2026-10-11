@@ -50,8 +50,8 @@ func text(_ string: String, size: CGFloat, weight: NSFont.Weight, color: NSColor
 }
 
 // The panel hangs under the candle in the menu bar.
-let crop: CGFloat = 50 // the title bar of the preview window
-let source = NSRect(x: 0, y: 0, width: panel.size.width, height: panel.size.height - crop * panel.size.height / 1122)
+// The preview window is borderless, so the capture is the panel alone.
+let source = NSRect(x: 0, y: 0, width: panel.size.width, height: panel.size.height)
 let panelWidth: CGFloat = 470
 let panelHeight = panelWidth * source.height / source.width
 let panelRect = CGRect(x: width - 140 - panelWidth, y: height - barHeight - 12 - panelHeight, width: panelWidth, height: panelHeight)

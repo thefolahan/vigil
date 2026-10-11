@@ -45,12 +45,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.appearance = NSAppearance(named: style == "dark" ? .darkAqua : .aqua)
         }
         if UserDefaults.standard.bool(forKey: "VigilPreviewWindow") {
-            let window = NSWindow(contentRect: .zero, styleMask: [.titled, .closable, .fullSizeContentView], backing: .buffered, defer: false)
-            window.titlebarAppearsTransparent = true
-            window.titleVisibility = .hidden
-            for button in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
-                window.standardWindowButton(button)?.isHidden = true
-            }
+            let window = PreviewWindow(contentRect: .zero, styleMask: [.borderless], backing: .buffered, defer: false)
+            window.isMovableByWindowBackground = true
+            window.hasShadow = true
             let hosting = NSHostingView(rootView: PanelView().environmentObject(model))
             let size = hosting.fittingSize
             if #available(macOS 26.0, *) {
@@ -76,8 +73,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 window.contentView = effect
             }
             window.setContentSize(size)
-            // Wrapped text settles a pass later and makes the panel taller.
-            DispatchQueue.main.async { window.setContentSize(hosting.fittingSize) }
             window.center()
             window.makeKeyAndOrderFront(nil)
             NSApp.setActivationPolicy(.regular)
@@ -89,4 +84,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         model.shutDown()
     }
+}
+
+/// A borderless window that can still be key, so controls draw as active.
+final class PreviewWindow: NSWindow {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
 }

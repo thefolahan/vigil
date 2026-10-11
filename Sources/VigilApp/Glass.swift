@@ -50,22 +50,17 @@ struct GlassGroup<Content: View>: View {
     }
 }
 
-/// A switch tinted with the candle's amber. macOS 26 draws its own glass
-/// switch; older systems get the hand drawn one.
+/// A switch in the candle's amber. The system switch on macOS always takes
+/// the accent colour and ignores a tint, so Vigil draws its own.
 struct AmberToggle: View {
     @Binding var isOn: Bool
     var help: String
 
     var body: some View {
-        Group {
-            if #available(macOS 26.0, *) {
-                Toggle("", isOn: $isOn).toggleStyle(.switch).tint(.flame)
-            } else {
-                Toggle("", isOn: $isOn).toggleStyle(FlameSwitch())
-            }
-        }
-        .labelsHidden()
-        .help(help)
+        Toggle("", isOn: $isOn)
+            .toggleStyle(FlameSwitch())
+            .labelsHidden()
+            .help(help)
     }
 }
 

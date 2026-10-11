@@ -132,15 +132,21 @@ struct FlameSwitch: ToggleStyle {
         } label: {
             ZStack(alignment: configuration.isOn ? .trailing : .leading) {
                 Capsule()
-                    .fill(configuration.isOn ? Color.flame : Color.primary.opacity(0.16))
-                    .frame(width: 34, height: 20)
+                    .fill(configuration.isOn
+                          ? AnyShapeStyle(LinearGradient(colors: [Color(red: 1, green: 0.74, blue: 0.33), Color(red: 0.97, green: 0.56, blue: 0.16)],
+                                                         startPoint: .top, endPoint: .bottom))
+                          : AnyShapeStyle(Color.primary.opacity(0.16)))
+                    .overlay(Capsule().strokeBorder(Color.black.opacity(0.08), lineWidth: 0.5))
+                    .shadow(color: configuration.isOn ? Color.flame.opacity(0.45) : .clear, radius: 4)
+                    .frame(width: 38, height: 22)
                 Circle()
-                    .fill(.white)
-                    .shadow(color: .black.opacity(0.25), radius: 1, y: 0.5)
-                    .frame(width: 16, height: 16)
+                    .fill(LinearGradient(colors: [.white, Color(white: 0.93)], startPoint: .top, endPoint: .bottom))
+                    .overlay(Circle().strokeBorder(Color.white.opacity(0.8), lineWidth: 0.5))
+                    .shadow(color: .black.opacity(0.25), radius: 1.5, y: 1)
+                    .frame(width: 18, height: 18)
                     .padding(2)
             }
-            .animation(.easeInOut(duration: 0.15), value: configuration.isOn)
+            .animation(.spring(response: 0.25, dampingFraction: 0.75), value: configuration.isOn)
         }
         .buttonStyle(.plain)
         .accessibilityRepresentation { Toggle(isOn: configuration.$isOn) { configuration.label } }

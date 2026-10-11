@@ -5,11 +5,20 @@ struct PanelView: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.openSettings) private var openSettings
     @State private var showHistory = false
+    @State private var window: NSWindow?
+    @State private var panelHeight: CGFloat = 0
+    /// Height of the header, footer and padding around the scrolling middle.
+    @State private var chrome: CGFloat = 150
+    @State private var headerHeight: CGFloat = 0
+    @State private var footerHeight: CGFloat = 0
+    /// The tallest the window can be on its screen, below its top edge.
+    @State private var room: CGFloat = NSScreen.main?.visibleFrame.height ?? 800
 
     var body: some View {
         GlassGroup(spacing: 0) {
             VStack(alignment: .leading, spacing: 10) {
                 header
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { headerHeight = $0; updateChrome() }
                 // The menu bar cannot scroll its window, so everything between
                 // the header and the footer scrolls once it is taller than
                 // the screen allows, such as with history open.
@@ -38,20 +47,44 @@ struct PanelView: View {
                     }
                 }
                 footer
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { footerHeight = $0; updateChrome() }
             }
             .padding(12)
             .fixedSize(horizontal: false, vertical: true)
         }
         .frame(width: 360)
         .background(PanelBackdrop(lit: model.isAwake))
+        .background(WindowReader { window = $0; fitWindow() })
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { panelHeight = $0; fitWindow() }
         .onAppear { model.tick() }
     }
 
-    /// Room for the scrolling middle: the visible screen less the menu bar
-    /// gap, the header and the footer.
+    /// Room for the scrolling middle: what the screen allows below the
+    /// window's top edge, less the header and footer.
     private var maxScrollHeight: CGFloat {
-        let screen = NSScreen.main?.visibleFrame.height ?? 800
-        return max(240, screen - 190)
+        max(200, room - chrome)
+    }
+
+    private func updateChrome() {
+        chrome = headerHeight + footerHeight + 12 * 2 + 10 * 2
+    }
+
+    /// The menu bar sizes its window once, when it opens, and does not
+    /// reliably follow the panel after that. Opening history then left the
+    /// bottom cut off with nothing to scroll, and a shrinking panel left
+    /// empty glass above and below it. So the panel sizes its own window,
+    /// keeping the top edge under the menu bar where it is.
+    private func fitWindow() {
+        guard let window, panelHeight > 0 else { return }
+        if let screen = window.screen {
+            room = window.frame.maxY - screen.visibleFrame.minY - 12
+        }
+        var frame = window.frame
+        let target = window.frameRect(forContentRect: NSRect(x: 0, y: 0, width: frame.width, height: panelHeight)).height
+        guard abs(frame.height - target) > 0.5 else { return }
+        frame.origin.y = frame.maxY - target
+        frame.size.height = target
+        window.setFrame(frame, display: true)
     }
 
     // MARK: Header
@@ -251,6 +284,29 @@ struct PanelView: View {
         .controlSize(.regular)
         .glassButton()
         .padding(.top, 2)
+    }
+}
+
+/// Hands back the window a view is in, once it is in one.
+struct WindowReader: NSViewRepresentable {
+    var found: (NSWindow) -> Void
+
+    func makeNSView(context: Context) -> NSView { Probe(found: found) }
+    func updateNSView(_ view: NSView, context: Context) {}
+
+    private final class Probe: NSView {
+        let found: (NSWindow) -> Void
+        init(found: @escaping (NSWindow) -> Void) {
+            self.found = found
+            super.init(frame: .zero)
+        }
+        required init?(coder: NSCoder) { nil }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            guard let window else { return }
+            DispatchQueue.main.async { [found] in found(window) }
+        }
     }
 }
 
