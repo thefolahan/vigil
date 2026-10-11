@@ -10,13 +10,33 @@ struct PanelView: View {
         GlassGroup(spacing: 0) {
             VStack(alignment: .leading, spacing: 10) {
                 header
-                agentsSection
-                lidSection
-                holdSection
-                if showHistory {
-                    HistoryList(sessions: model.sessions)
-                        .glassCard()
-                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                // The menu bar cannot scroll its window, so everything between
+                // the header and the footer scrolls once it is taller than
+                // the screen allows, such as with history open.
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 10) {
+                            agentsSection
+                            lidSection
+                            holdSection
+                            if showHistory {
+                                HistoryList(sessions: model.sessions)
+                                    .glassCard()
+                                    .id("history")
+                                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                            }
+                        }
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
+                    }
+                    .scrollBounceBehavior(.basedOnSize)
+                    .scrollIndicators(.automatic)
+                    .frame(height: min(contentHeight, maxScrollHeight))
+                    .onChange(of: showHistory) { _, shown in
+                        guard shown else { return }
+                        DispatchQueue.main.async {
+                            withAnimation(.smooth) { proxy.scrollTo("history", anchor: .bottom) }
+                        }
+                    }
                 }
                 footer
             }
@@ -26,6 +46,15 @@ struct PanelView: View {
         .frame(width: 360)
         .background(PanelBackdrop(lit: model.isAwake))
         .onAppear { model.tick() }
+    }
+
+    @State private var contentHeight: CGFloat = 400
+
+    /// Room for the scrolling middle: the visible screen less the menu bar
+    /// gap, the header and the footer.
+    private var maxScrollHeight: CGFloat {
+        let screen = NSScreen.main?.visibleFrame.height ?? 800
+        return max(240, screen - 190)
     }
 
     // MARK: Header
@@ -91,17 +120,7 @@ struct PanelView: View {
                         .glassCard(cornerRadius: 12)
                     }
                 }
-                // A few rows show in full; more than that scroll in a fixed
-                // height. The menu bar sizes its window to the panel's ideal
-                // height, so this cannot be left to the layout to decide.
-                if held.count * 66 + idle.count * 28 <= 330 {
-                    rows
-                } else {
-                    ScrollView { rows }
-                        .scrollBounceBehavior(.basedOnSize)
-                        .scrollIndicators(.never)
-                        .frame(height: 330)
-                }
+                rows
             }
         }
         .opacity(model.watchAgents ? 1 : 0.5)
@@ -117,7 +136,7 @@ struct PanelView: View {
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(model.lidHeldOpen ? Color.flame : .secondary)
                     .frame(width: 28, height: 28)
-                    .glassDisc(tint: model.lidHeldOpen ? .flame : nil)
+                    .background(Circle().fill(model.lidHeldOpen ? Color.flame.opacity(0.18) : Color.primary.opacity(0.07)))
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Keep running with the lid closed")
                         .font(.system(size: 13, weight: .medium))
@@ -170,7 +189,7 @@ struct PanelView: View {
                 .foregroundStyle(model.holdActive ? Color.flame : .secondary)
                 .symbolEffect(.pulse, isActive: model.holdActive)
                 .frame(width: 28, height: 28)
-                .glassDisc(tint: model.holdActive ? .flame : nil)
+                .background(Circle().fill(model.holdActive ? Color.flame.opacity(0.18) : Color.primary.opacity(0.07)))
             VStack(alignment: .leading, spacing: 2) {
                 Text("Hold awake").font(.system(size: 13, weight: .medium))
                 Text(holdStatus).font(.system(size: 11)).foregroundStyle(.secondary).monospacedDigit()
