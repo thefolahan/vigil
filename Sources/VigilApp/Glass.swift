@@ -2,28 +2,27 @@ import SwiftUI
 
 /// Liquid Glass on macOS 26 and later, frosted material on older systems.
 extension View {
-    /// A floating glass card. A tint colours the glass, for example amber
-    /// while an agent holds the Mac awake.
-    @ViewBuilder
-    func glassCard(cornerRadius: CGFloat = 16, tint: Color? = nil, interactive: Bool = false) -> some View {
+    /// A content card. The menu bar panel is already glass, so cards are a
+    /// light wash with a hairline edge rather than glass on glass.
+    func glassCard(cornerRadius: CGFloat = 14, tint: Color? = nil) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        return background(shape.fill((tint ?? .primary).opacity(tint == nil ? 0.05 : 0.10)))
+            .overlay(shape.strokeBorder(Color.primary.opacity(0.07), lineWidth: 0.5))
+    }
+
+    /// A glass disc behind a symbol or the candle.
+    @ViewBuilder
+    func glassDisc(tint: Color? = nil) -> some View {
         if #available(macOS 26.0, *) {
-            glassEffect(Glass.regular.tint(tint?.opacity(0.22)).interactive(interactive), in: shape)
+            glassEffect(Glass.regular.tint(tint?.opacity(0.25)), in: Circle())
         } else {
-            background(shape.fill((tint ?? .clear).opacity(0.12)))
-                .background(shape.fill(.thinMaterial))
-                .overlay(shape.strokeBorder(Color.primary.opacity(0.08)))
+            background(Circle().fill((tint ?? .primary).opacity(tint == nil ? 0.06 : 0.16)))
         }
     }
 
-    /// A glass capsule, for small chips such as the battery gauge.
-    @ViewBuilder
+    /// A small chip such as the battery gauge.
     func glassCapsule(tint: Color? = nil) -> some View {
-        if #available(macOS 26.0, *) {
-            glassEffect(Glass.regular.tint(tint?.opacity(0.3)), in: Capsule())
-        } else {
-            background(Capsule().fill((tint ?? .primary).opacity(tint == nil ? 0.06 : 0.18)))
-        }
+        background(Capsule().fill((tint ?? .primary).opacity(tint == nil ? 0.06 : 0.16)))
     }
 
     /// The system glass button where available.
@@ -77,12 +76,10 @@ struct PanelBackdrop: View {
 
     var body: some View {
         ZStack {
-            RadialGradient(colors: [Color.flame.opacity(lit ? 0.38 : 0.0), .clear],
+            RadialGradient(colors: [Color.flame.opacity(lit ? 0.22 : 0.0), .clear],
                            center: UnitPoint(x: 0.12, y: 0.02), startRadius: 0, endRadius: 280)
-            RadialGradient(colors: [Color.working.opacity(lit ? 0.14 : 0.0), .clear],
+            RadialGradient(colors: [Color.working.opacity(lit ? 0.08 : 0.0), .clear],
                            center: UnitPoint(x: 0.95, y: 0.35), startRadius: 0, endRadius: 240)
-            RadialGradient(colors: [Color.accentColor.opacity(0.10), .clear],
-                           center: UnitPoint(x: 0.1, y: 1.0), startRadius: 0, endRadius: 300)
         }
         .animation(.easeInOut(duration: 0.8), value: lit)
         .allowsHitTesting(false)

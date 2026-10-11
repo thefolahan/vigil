@@ -21,6 +21,7 @@ struct PanelView: View {
                 footer
             }
             .padding(12)
+            .fixedSize(horizontal: false, vertical: true)
         }
         .frame(width: 360)
         .background(PanelBackdrop(lit: model.isAwake))
@@ -33,7 +34,7 @@ struct PanelView: View {
         HStack(spacing: 12) {
             CandleView(lit: model.isAwake)
                 .frame(width: 52, height: 52)
-                .glassCard(cornerRadius: 26, tint: model.isAwake ? .flame : nil)
+                .glassDisc(tint: model.isAwake ? .flame : nil)
             VStack(alignment: .leading, spacing: 3) {
                 Text(model.headline)
                     .font(.system(size: 17, weight: .semibold, design: .rounded))
@@ -87,17 +88,20 @@ struct PanelView: View {
                             }
                         }
                         .padding(.vertical, 4)
-                        .glassCard(cornerRadius: 14)
+                        .glassCard(cornerRadius: 12)
                     }
                 }
-                // Shows every row when they fit and scrolls only when they do not.
-                ViewThatFits(in: .vertical) {
+                // A few rows show in full; more than that scroll in a fixed
+                // height. The menu bar sizes its window to the panel's ideal
+                // height, so this cannot be left to the layout to decide.
+                if held.count * 66 + idle.count * 28 <= 330 {
                     rows
+                } else {
                     ScrollView { rows }
                         .scrollBounceBehavior(.basedOnSize)
                         .scrollIndicators(.never)
+                        .frame(height: 330)
                 }
-                .frame(maxHeight: 340)
             }
         }
         .opacity(model.watchAgents ? 1 : 0.5)
@@ -113,7 +117,7 @@ struct PanelView: View {
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(model.lidHeldOpen ? Color.flame : .secondary)
                     .frame(width: 28, height: 28)
-                    .glassCard(cornerRadius: 14, tint: model.lidHeldOpen ? .flame : nil)
+                    .glassDisc(tint: model.lidHeldOpen ? .flame : nil)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Keep running with the lid closed")
                         .font(.system(size: 13, weight: .medium))
@@ -166,7 +170,7 @@ struct PanelView: View {
                 .foregroundStyle(model.holdActive ? Color.flame : .secondary)
                 .symbolEffect(.pulse, isActive: model.holdActive)
                 .frame(width: 28, height: 28)
-                .glassCard(cornerRadius: 14, tint: model.holdActive ? .flame : nil)
+                .glassDisc(tint: model.holdActive ? .flame : nil)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Hold awake").font(.system(size: 13, weight: .medium))
                 Text(holdStatus).font(.system(size: 11)).foregroundStyle(.secondary).monospacedDigit()
@@ -298,7 +302,7 @@ struct AgentRow: View {
             }
         }
         .padding(10)
-        .glassCard(cornerRadius: 14, tint: agent.activity == .working ? .working : nil, interactive: true)
+        .glassCard(cornerRadius: 12, tint: agent.activity == .working ? .working : nil)
         .help("PID \(agent.pid), \(agent.directory ?? "unknown folder")")
     }
 
