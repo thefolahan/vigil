@@ -18,11 +18,21 @@ struct SettingsView: View {
                 }
                 Text("An agent that goes quiet keeps the Mac awake this long, so a slow reply or a pause between steps does not end the session.")
                     .font(.caption).foregroundStyle(.secondary)
-                LabeledContent("Recognised") {
-                    Text(AgentCatalog.builtIn.map(\.name).joined(separator: ", "))
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.trailing)
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Recognised")
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12, alignment: .leading), count: 3),
+                              alignment: .leading, spacing: 10) {
+                        ForEach(AgentCatalog.builtIn, id: \.id) { kind in
+                            HStack(spacing: 8) {
+                                AgentBadge(kind: kind, size: 22)
+                                Text(kind.name)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                        }
+                    }
                 }
+                .padding(.vertical, 2)
             }
 
             Section("Lid closed") {

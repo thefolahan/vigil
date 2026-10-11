@@ -26,11 +26,10 @@ struct PanelView: View {
                                     .transition(.opacity.combined(with: .move(edge: .bottom)))
                             }
                         }
-                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
                     }
                     .scrollBounceBehavior(.basedOnSize)
                     .scrollIndicators(.automatic)
-                    .frame(height: min(contentHeight, maxScrollHeight))
+                    .modifier(CappedHeight(limit: maxScrollHeight))
                     .onChange(of: showHistory) { _, shown in
                         guard shown else { return }
                         DispatchQueue.main.async {
@@ -47,8 +46,6 @@ struct PanelView: View {
         .background(PanelBackdrop(lit: model.isAwake))
         .onAppear { model.tick() }
     }
-
-    @State private var contentHeight: CGFloat = 400
 
     /// Room for the scrolling middle: the visible screen less the menu bar
     /// gap, the header and the footer.
@@ -257,6 +254,31 @@ struct PanelView: View {
     }
 }
 
+/// Sizes a scroll view to its content, up to a limit. The height is worked
+/// out in one layout pass rather than measured and stored, so the menu bar
+/// window never opens at a stale size with empty glass above and below.
+struct CappedHeight: ViewModifier {
+    var limit: CGFloat
+
+    func body(content: Content) -> some View {
+        CappedHeightLayout(limit: limit) { content }
+    }
+}
+
+private struct CappedHeightLayout: Layout {
+    var limit: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard let view = subviews.first else { return .zero }
+        let ideal = view.sizeThatFits(ProposedViewSize(width: proposal.width, height: nil))
+        return CGSize(width: proposal.width ?? ideal.width, height: min(ideal.height, limit))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        subviews.first?.place(at: bounds.origin, proposal: ProposedViewSize(bounds.size))
+    }
+}
+
 struct SectionTitle: View {
     var title: String
     var trailing: String?
@@ -365,28 +387,47 @@ struct AgentBadge: View {
     var size: CGFloat = 28
 
     var body: some View {
-        Text(String(kind.name.prefix(1)))
-            .font(.system(size: size * 0.47, weight: .bold, design: .rounded))
-            .foregroundStyle(.white)
-            .frame(width: size, height: size)
-            .background(RoundedRectangle(cornerRadius: size * 0.3, style: .continuous).fill(color.gradient))
-            .overlay(
-                RoundedRectangle(cornerRadius: size * 0.3, style: .continuous)
-                    .strokeBorder(LinearGradient(colors: [.white.opacity(0.45), .white.opacity(0.05)], startPoint: .top, endPoint: .bottom), lineWidth: 0.75)
-            )
-            .shadow(color: color.opacity(0.35), radius: size * 0.15, y: size * 0.05)
+        let tile = RoundedRectangle(cornerRadius: size * 0.3, style: .continuous)
+        Group {
+            if let logo = AgentLogo.shape(for: kind.id) {
+                logo.fill(.white).frame(width: size * 0.6, height: size * 0.6)
+            } else {
+                Text(String(kind.name.prefix(1)))
+                    .font(.system(size: size * 0.47, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+            }
+        }
+        .frame(width: size, height: size)
+        .background(tile.fill(fill))
+        .overlay(
+            tile.strokeBorder(LinearGradient(colors: [.white.opacity(0.45), .white.opacity(0.05)], startPoint: .top, endPoint: .bottom), lineWidth: 0.75)
+        )
+        .shadow(color: shadow.opacity(0.35), radius: size * 0.15, y: size * 0.05)
+        .accessibilityHidden(true)
     }
+
+    private var fill: AnyShapeStyle {
+        if kind.id == "gemini" {
+            return AnyShapeStyle(LinearGradient(colors: [Color(red: 0.26, green: 0.52, blue: 0.96), Color(red: 0.61, green: 0.45, blue: 0.80)],
+                                                startPoint: .bottomLeading, endPoint: .topTrailing))
+        }
+        return AnyShapeStyle(color.gradient)
+    }
+
+    private var shadow: Color { kind.id == "gemini" ? Color(red: 0.4, green: 0.5, blue: 0.9) : color }
 
     private var color: Color {
         switch kind.id {
         case "claude": return Color(red: 0.85, green: 0.47, blue: 0.34)
-        case "codex": return Color(red: 0.20, green: 0.22, blue: 0.26)
-        case "gemini": return Color(red: 0.26, green: 0.47, blue: 0.95)
-        case "copilot": return Color(red: 0.51, green: 0.33, blue: 0.86)
-        case "cursor": return Color(red: 0.35, green: 0.35, blue: 0.38)
-        case "opencode": return Color(red: 0.86, green: 0.62, blue: 0.10)
+        case "codex": return Color(red: 0.13, green: 0.14, blue: 0.16)
+        case "copilot": return Color(red: 0.14, green: 0.16, blue: 0.20)
+        case "cursor": return Color(red: 0.10, green: 0.10, blue: 0.11)
+        case "opencode": return Color(red: 0.20, green: 0.20, blue: 0.22)
+        case "qwen": return Color(red: 0.41, green: 0.31, blue: 0.94)
         case "amp": return Color(red: 0.89, green: 0.27, blue: 0.27)
         case "aider": return Color(red: 0.16, green: 0.62, blue: 0.40)
+        case "goose": return Color(red: 0.86, green: 0.62, blue: 0.10)
+        case "droid": return Color(red: 0.95, green: 0.45, blue: 0.15)
         default: return Color(red: 0.40, green: 0.45, blue: 0.55)
         }
     }
