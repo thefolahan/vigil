@@ -48,8 +48,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let window = NSWindow(contentRect: .zero, styleMask: [.titled, .closable, .fullSizeContentView], backing: .buffered, defer: false)
             window.titlebarAppearsTransparent = true
             window.titleVisibility = .hidden
-            window.contentView = NSHostingView(rootView: PanelView().environmentObject(model).background(.regularMaterial))
-            window.setContentSize(window.contentView!.fittingSize)
+            for button in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
+                window.standardWindowButton(button)?.isHidden = true
+            }
+            let hosting = NSHostingView(rootView: PanelView().environmentObject(model))
+            let size = hosting.fittingSize
+            if #available(macOS 26.0, *) {
+                // The same glass the menu bar panel sits on.
+                let glass = NSGlassEffectView()
+                glass.cornerRadius = 16
+                glass.contentView = hosting
+                window.isOpaque = false
+                window.backgroundColor = .clear
+                window.contentView = glass
+            } else {
+                let effect = NSVisualEffectView()
+                effect.material = .popover
+                effect.state = .active
+                hosting.translatesAutoresizingMaskIntoConstraints = false
+                effect.addSubview(hosting)
+                NSLayoutConstraint.activate([
+                    hosting.leadingAnchor.constraint(equalTo: effect.leadingAnchor),
+                    hosting.trailingAnchor.constraint(equalTo: effect.trailingAnchor),
+                    hosting.topAnchor.constraint(equalTo: effect.topAnchor),
+                    hosting.bottomAnchor.constraint(equalTo: effect.bottomAnchor)
+                ])
+                window.contentView = effect
+            }
+            window.setContentSize(size)
+            // Wrapped text settles a pass later and makes the panel taller.
+            DispatchQueue.main.async { window.setContentSize(hosting.fittingSize) }
             window.center()
             window.makeKeyAndOrderFront(nil)
             NSApp.setActivationPolicy(.regular)

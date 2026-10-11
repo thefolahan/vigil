@@ -3,36 +3,41 @@ import VigilKit
 
 struct PanelView: View {
     @EnvironmentObject var model: AppModel
+    @Environment(\.openSettings) private var openSettings
     @State private var showHistory = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            header
-            Divider()
-            agentsSection
-            Divider()
-            lidSection
-            Divider()
-            holdSection
-            if showHistory {
-                Divider()
-                HistoryList(sessions: model.sessions)
+        GlassGroup(spacing: 0) {
+            VStack(alignment: .leading, spacing: 10) {
+                header
+                agentsSection
+                lidSection
+                holdSection
+                if showHistory {
+                    HistoryList(sessions: model.sessions)
+                        .glassCard()
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                }
+                footer
             }
-            Divider()
-            footer
+            .padding(12)
         }
         .frame(width: 360)
+        .background(PanelBackdrop(lit: model.isAwake))
         .onAppear { model.tick() }
     }
 
     // MARK: Header
 
     private var header: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 12) {
             CandleView(lit: model.isAwake)
+                .frame(width: 52, height: 52)
+                .glassCard(cornerRadius: 26, tint: model.isAwake ? .flame : nil)
             VStack(alignment: .leading, spacing: 3) {
                 Text(model.headline)
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(size: 17, weight: .semibold, design: .rounded))
+                    .contentTransition(.numericText())
                 Text(model.detail)
                     .font(.system(size: 12))
                     .foregroundStyle(model.trip == nil ? .secondary : Color.orange)
@@ -40,14 +45,12 @@ struct PanelView: View {
                     .monospacedDigit()
             }
             Spacer(minLength: 0)
-            Toggle("", isOn: $model.watchAgents)
-                .toggleStyle(FlameSwitch())
-                .controlSize(.small)
-                .labelsHidden()
-                .help(model.watchAgents ? "Stop watching agents" : "Watch agents")
+            AmberToggle(isOn: $model.watchAgents, help: model.watchAgents ? "Stop watching agents" : "Watch agents")
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
+        .padding(.horizontal, 6)
+        .padding(.top, 4)
+        .padding(.bottom, 2)
+        .animation(.smooth, value: model.headline)
     }
 
     // MARK: Agents
@@ -55,47 +58,62 @@ struct PanelView: View {
     private var agentsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionTitle(title: "Agents", trailing: model.agents.isEmpty ? nil : "\(model.workingAgents.count) of \(model.agents.count) working")
+                .padding(.horizontal, 6)
             if model.agents.isEmpty {
-                Text("No agents running. Start Claude Code, Codex, Gemini CLI or another agent and Vigil keeps the Mac awake while it works.")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.vertical, 4)
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 15))
+                        .foregroundStyle(.secondary)
+                    Text("No agents running. Start Claude Code, Codex, Gemini CLI or another agent and Vigil keeps the Mac awake while it works.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .glassCard()
             } else {
                 let held = model.agents.filter { model.heldBy.contains($0) }
                     .sorted { ($0.activity == .working ? 0 : 1, $0.started) < ($1.activity == .working ? 0 : 1, $1.started) }
                 let idle = model.agents.filter { !held.contains($0) }
-                ScrollView {
-                    VStack(spacing: 6) {
-                        ForEach(held) { agent in
-                            AgentRow(agent: agent, now: model.now, holding: true)
-                        }
-                        if !idle.isEmpty {
-                            VStack(spacing: 0) {
-                                ForEach(idle) { agent in
-                                    IdleAgentRow(agent: agent, now: model.now)
-                                }
+                let rows = VStack(spacing: 8) {
+                    ForEach(held) { agent in
+                        AgentRow(agent: agent, now: model.now, holding: true)
+                    }
+                    if !idle.isEmpty {
+                        VStack(spacing: 0) {
+                            ForEach(idle) { agent in
+                                IdleAgentRow(agent: agent, now: model.now)
                             }
-                            .padding(.vertical, 3)
-                            .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Color.primary.opacity(0.03)))
                         }
+                        .padding(.vertical, 4)
+                        .glassCard(cornerRadius: 14)
                     }
                 }
-                .scrollBounceBehavior(.basedOnSize)
-                .frame(maxHeight: 260)
-                .fixedSize(horizontal: false, vertical: held.count * 3 + idle.count <= 9)
+                // Shows every row when they fit and scrolls only when they do not.
+                ViewThatFits(in: .vertical) {
+                    rows
+                    ScrollView { rows }
+                        .scrollBounceBehavior(.basedOnSize)
+                        .scrollIndicators(.never)
+                }
+                .frame(maxHeight: 340)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
         .opacity(model.watchAgents ? 1 : 0.5)
+        .animation(.smooth, value: model.agents.map(\.id))
     }
 
     // MARK: Lid mode
 
     private var lidSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .center, spacing: 10) {
+                Image(systemName: model.lidHeldOpen ? "laptopcomputer.and.arrow.down" : "laptopcomputer")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(model.lidHeldOpen ? Color.flame : .secondary)
+                    .frame(width: 28, height: 28)
+                    .glassCard(cornerRadius: 14, tint: model.lidHeldOpen ? .flame : nil)
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Keep running with the lid closed")
                         .font(.system(size: 13, weight: .medium))
@@ -103,12 +121,13 @@ struct PanelView: View {
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
-                Spacer()
+                Spacer(minLength: 0)
                 if model.lidModeInstalled {
-                    Toggle("", isOn: $model.lidMode).toggleStyle(FlameSwitch()).labelsHidden()
+                    AmberToggle(isOn: $model.lidMode, help: model.lidMode ? "Turn off lid mode" : "Turn on lid mode")
                 } else {
                     Button(model.settingUp ? "Setting up" : "Set up") { model.setUpLidMode() }
                         .controlSize(.small)
+                        .glassButton()
                         .disabled(model.settingUp)
                 }
             }
@@ -126,8 +145,8 @@ struct PanelView: View {
                 Text(error).font(.system(size: 11)).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(12)
+        .glassCard()
     }
 
     private var lidStatus: String {
@@ -141,14 +160,22 @@ struct PanelView: View {
     // MARK: Hold
 
     private var holdSection: some View {
-        HStack {
+        HStack(spacing: 10) {
+            Image(systemName: model.holdActive ? "hourglass" : "hourglass.bottomhalf.filled")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(model.holdActive ? Color.flame : .secondary)
+                .symbolEffect(.pulse, isActive: model.holdActive)
+                .frame(width: 28, height: 28)
+                .glassCard(cornerRadius: 14, tint: model.holdActive ? .flame : nil)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Hold awake").font(.system(size: 13, weight: .medium))
                 Text(holdStatus).font(.system(size: 11)).foregroundStyle(.secondary).monospacedDigit()
             }
-            Spacer()
+            Spacer(minLength: 0)
             if model.holdActive {
-                Button("Stop") { model.stopHold() }.controlSize(.small)
+                Button("Stop") { model.stopHold() }
+                    .controlSize(.small)
+                    .glassButton()
             } else {
                 Menu("Start") {
                     Button("30 minutes") { model.hold(for: 30) }
@@ -158,13 +185,14 @@ struct PanelView: View {
                     Divider()
                     Button("Until I stop it") { model.hold(for: nil) }
                 }
-                .menuStyle(.borderedButton)
+                .menuStyle(.button)
+                .glassButton()
                 .controlSize(.small)
                 .fixedSize()
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(12)
+        .glassCard()
     }
 
     private var holdStatus: String {
@@ -176,28 +204,33 @@ struct PanelView: View {
     // MARK: Footer
 
     private var footer: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 8) {
             Button {
-                withAnimation(.easeInOut(duration: 0.2)) { showHistory.toggle() }
+                withAnimation(.smooth(duration: 0.3)) { showHistory.toggle() }
             } label: {
                 Label(showHistory ? "Hide history" : "History", systemImage: "clock.arrow.circlepath")
             }
             Spacer()
-            SettingsLink {
+            Button {
+                // A menu bar app is never frontmost on its own, so without
+                // this the Settings window opens behind other apps.
+                NSApp.activate()
+                openSettings()
+            } label: {
                 Label("Settings", systemImage: "gearshape")
             }
             Button {
                 NSApp.terminate(nil)
             } label: {
-                Label("Quit", systemImage: "power")
+                Image(systemName: "power")
             }
+            .help("Quit Vigil")
         }
-        .buttonStyle(.plain)
         .labelStyle(.titleAndIcon)
         .font(.system(size: 12))
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .controlSize(.regular)
+        .glassButton()
+        .padding(.top, 2)
     }
 }
 
@@ -229,10 +262,10 @@ struct Gauge: View {
             Image(systemName: symbol).font(.system(size: 10))
             Text(text).font(.system(size: 11))
         }
-        .padding(.horizontal, 7)
-        .padding(.vertical, 3)
-        .background(Capsule().fill(warning ? Color.orange.opacity(0.18) : Color.primary.opacity(0.06)))
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
         .foregroundStyle(warning ? Color.orange : Color.secondary)
+        .glassCapsule(tint: warning ? .orange : nil)
     }
 }
 
@@ -253,6 +286,7 @@ struct AgentRow: View {
                     Circle()
                         .fill(agent.activity == .working ? Color.working : (holding ? Color.flame : Color.secondary.opacity(0.5)))
                         .frame(width: 6, height: 6)
+                        .shadow(color: agent.activity == .working ? Color.working.opacity(0.8) : .clear, radius: 3)
                     Text(status).font(.system(size: 11)).foregroundStyle(.secondary).monospacedDigit()
                 }
             }
@@ -263,8 +297,8 @@ struct AgentRow: View {
                 Text(Format.rate(agent.traffic)).font(.system(size: 9)).foregroundStyle(.tertiary).monospacedDigit()
             }
         }
-        .padding(8)
-        .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Color.primary.opacity(0.045)))
+        .padding(10)
+        .glassCard(cornerRadius: 14, tint: agent.activity == .working ? .working : nil, interactive: true)
         .help("PID \(agent.pid), \(agent.directory ?? "unknown folder")")
     }
 
@@ -292,8 +326,8 @@ struct IdleAgentRow: View {
             Spacer(minLength: 4)
             Text(idleText).font(.system(size: 11)).foregroundStyle(.tertiary).monospacedDigit()
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
         .help("PID \(agent.pid), \(agent.directory ?? "unknown folder")")
     }
 
@@ -312,7 +346,12 @@ struct AgentBadge: View {
             .font(.system(size: size * 0.47, weight: .bold, design: .rounded))
             .foregroundStyle(.white)
             .frame(width: size, height: size)
-            .background(RoundedRectangle(cornerRadius: size * 0.25, style: .continuous).fill(color.gradient))
+            .background(RoundedRectangle(cornerRadius: size * 0.3, style: .continuous).fill(color.gradient))
+            .overlay(
+                RoundedRectangle(cornerRadius: size * 0.3, style: .continuous)
+                    .strokeBorder(LinearGradient(colors: [.white.opacity(0.45), .white.opacity(0.05)], startPoint: .top, endPoint: .bottom), lineWidth: 0.75)
+            )
+            .shadow(color: color.opacity(0.35), radius: size * 0.15, y: size * 0.05)
     }
 
     private var color: Color {
@@ -381,8 +420,8 @@ struct HistoryList: View {
                 }
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func summary(_ session: SessionRecord) -> String {

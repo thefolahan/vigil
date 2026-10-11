@@ -293,17 +293,22 @@ final class AppModel: ObservableObject {
     /// Installs the sudoers rule behind lid mode. macOS asks for an
     /// administrator password once.
     func setUpLidMode() {
+        guard !settingUp else { return }
         settingUp = true
         setupError = nil
-        defer { settingUp = false }
-        do {
-            let script = try LidMode.installScript(for: NSUserName())
-            try runAsAdministrator(script, prompt: "Vigil needs your password once to let you turn sleep off and on while the lid is closed.")
-            try LidMode.installGuard()
-            lidModeInstalled = LidMode.isInstalled()
-            if lidModeInstalled { lidMode = true } else { setupError = "Setup finished, but the rule did not take effect." }
-        } catch {
-            setupError = error.localizedDescription
+        // The password prompt blocks the main thread, so let the button show
+        // "Setting up" first.
+        DispatchQueue.main.async { [self] in
+            defer { settingUp = false }
+            do {
+                let script = try LidMode.installScript(for: NSUserName())
+                try runAsAdministrator(script, prompt: "Vigil needs your password once to let you turn sleep off and on while the lid is closed.")
+                try LidMode.installGuard()
+                lidModeInstalled = LidMode.isInstalled()
+                if lidModeInstalled { lidMode = true } else { setupError = "Setup finished, but the rule did not take effect." }
+            } catch {
+                setupError = error.localizedDescription
+            }
         }
     }
 
